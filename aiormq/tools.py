@@ -4,8 +4,15 @@ import time
 from functools import wraps
 from types import TracebackType
 from typing import (
-    Any, AsyncContextManager, Awaitable, Callable, Coroutine, Optional, Type,
-    TypeVar, Union,
+    Any,
+    AsyncContextManager,
+    Awaitable,
+    Callable,
+    Coroutine,
+    Optional,
+    Type,
+    TypeVar,
+    Union,
 )
 
 from yarl import URL
@@ -35,18 +42,18 @@ def awaitable(
 ) -> Callable[..., Coroutine[Any, Any, T]]:
     # Avoid python 3.8+ warning
     if asyncio.iscoroutinefunction(func):
-        return func     # type: ignore
+        return func  # type: ignore
 
     @wraps(func)
     async def wrap(*args: Any, **kwargs: Any) -> T:
         result = func(*args, **kwargs)
 
         if hasattr(result, "__await__"):
-            return await result     # type: ignore
+            return await result  # type: ignore
         if asyncio.iscoroutine(result) or asyncio.isfuture(result):
             return await result
 
-        return result               # type: ignore
+        return result  # type: ignore
 
     return wrap
 
@@ -55,12 +62,15 @@ class Countdown:
     __slots__ = "loop", "deadline"
 
     if platform.system() == "Windows":
+
         @staticmethod
         def _now() -> float:
             # windows monotonic timer resolution is not enough.
             # Have to use time.time()
             return time.time()
+
     else:
+
         @staticmethod
         def _now() -> float:
             return time.monotonic()
@@ -93,10 +103,12 @@ class Countdown:
 
         if self.deadline is None and not timeout:
             return await coro
+        print("coro", coro)
         return await asyncio.wait_for(coro, timeout=timeout)
 
     def enter_context(
-        self, ctx: AsyncContextManager[T],
+        self,
+        ctx: AsyncContextManager[T],
     ) -> AsyncContextManager[T]:
         return CountdownContext(self, ctx)
 
@@ -110,9 +122,12 @@ class CountdownContext(AsyncContextManager):
         return await self.countdown(self.ctx.__aenter__())
 
     async def __aexit__(
-        self, exc_type: Optional[Type[BaseException]],
-        exc_val: Optional[BaseException], exc_tb: Optional[TracebackType],
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
     ) -> Any:
-        return await self.countdown(
-            self.ctx.__aexit__(exc_type, exc_val, exc_tb),
-        )
+        # return await self.countdown(
+        #     self.ctx.__aexit__(exc_type, exc_val, exc_tb),
+        # )
+        return await self.ctx.__aexit__(exc_type, exc_val, exc_tb)

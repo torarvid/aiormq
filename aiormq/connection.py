@@ -9,7 +9,15 @@ from contextlib import suppress
 from io import BytesIO
 from types import MappingProxyType, TracebackType
 from typing import (
-    Any, Awaitable, Callable, Dict, Mapping, Optional, Tuple, Type, Union,
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    Mapping,
+    Optional,
+    Tuple,
+    Type,
+    Union,
 )
 
 import pamqp.frame
@@ -24,18 +32,34 @@ from pamqp.heartbeat import Heartbeat
 from yarl import URL
 
 from .abc import (
-    AbstractChannel, AbstractConnection, ArgumentsType, ChannelFrame,
-    ExceptionType, SSLCerts, TaskType, URLorStr,
+    AbstractChannel,
+    AbstractConnection,
+    ArgumentsType,
+    ChannelFrame,
+    ExceptionType,
+    SSLCerts,
+    TaskType,
+    URLorStr,
 )
 from .auth import AuthMechanism
 from .base import Base, task
 from .channel import Channel
 from .exceptions import (
-    AMQPConnectionError, AMQPError, AuthenticationError, ConnectionChannelError,
-    ConnectionClosed, ConnectionCommandInvalid, ConnectionFrameError,
-    ConnectionInternalError, ConnectionNotAllowed, ConnectionNotImplemented,
-    ConnectionResourceError, ConnectionSyntaxError, ConnectionUnexpectedFrame,
-    IncompatibleProtocolError, ProbableAuthenticationError,
+    AMQPConnectionError,
+    AMQPError,
+    AuthenticationError,
+    ConnectionChannelError,
+    ConnectionClosed,
+    ConnectionCommandInvalid,
+    ConnectionFrameError,
+    ConnectionInternalError,
+    ConnectionNotAllowed,
+    ConnectionNotImplemented,
+    ConnectionResourceError,
+    ConnectionSyntaxError,
+    ConnectionUnexpectedFrame,
+    IncompatibleProtocolError,
+    ProbableAuthenticationError,
 )
 from .tools import Countdown, censor_url
 
@@ -43,9 +67,11 @@ from .tools import Countdown, censor_url
 # noinspection PyUnresolvedReferences
 try:
     from importlib.metadata import Distribution
+
     __version__ = Distribution.from_name("aiormq").version
 except ImportError:
     import pkg_resources
+
     __version__ = pkg_resources.get_distribution("aiormq").version
 
 
@@ -72,17 +98,19 @@ TimeoutType = Optional[TimeType]
 ReceivedFrame = Tuple[int, int, FrameTypes]
 
 
-EXCEPTION_MAPPING = MappingProxyType({
-    501: ConnectionFrameError,
-    502: ConnectionSyntaxError,
-    503: ConnectionCommandInvalid,
-    504: ConnectionChannelError,
-    505: ConnectionUnexpectedFrame,
-    506: ConnectionResourceError,
-    530: ConnectionNotAllowed,
-    540: ConnectionNotImplemented,
-    541: ConnectionInternalError,
-})
+EXCEPTION_MAPPING = MappingProxyType(
+    {
+        501: ConnectionFrameError,
+        502: ConnectionSyntaxError,
+        503: ConnectionCommandInvalid,
+        504: ConnectionChannelError,
+        505: ConnectionUnexpectedFrame,
+        506: ConnectionResourceError,
+        530: ConnectionNotAllowed,
+        540: ConnectionNotImplemented,
+        541: ConnectionInternalError,
+    }
+)
 
 
 def exception_by_code(frame: spec.Connection.Close) -> AMQPError:
@@ -132,7 +160,8 @@ class FrameReceiver(AsyncIterable):
     _loop: asyncio.AbstractEventLoop
 
     def __init__(
-        self, reader: asyncio.StreamReader,
+        self,
+        reader: asyncio.StreamReader,
     ):
         self.reader: asyncio.StreamReader = reader
         self.started: bool = False
@@ -251,7 +280,6 @@ class Connection(Base, AbstractConnection):
         loop: Optional[asyncio.AbstractEventLoop] = None,
         context: Optional[ssl.SSLContext] = None,
     ):
-
         super().__init__(loop=loop or asyncio.get_event_loop(), parent=None)
 
         self.url = URL(url)
@@ -297,8 +325,8 @@ class Connection(Base, AbstractConnection):
         self.__update_secret_future: Optional[asyncio.Future] = None
         self.__connection_unblocked: asyncio.Event = asyncio.Event()
         self.__heartbeat_grace_timeout = (
-            (self.heartbeat_timeout + 1) * self.HEARTBEAT_GRACE_MULTIPLIER
-        )
+            self.heartbeat_timeout + 1
+        ) * self.HEARTBEAT_GRACE_MULTIPLIER
         self.__last_frame_time: float = self.loop.time()
 
     async def ready(self) -> None:
@@ -306,9 +334,11 @@ class Connection(Base, AbstractConnection):
         await self.__connection_unblocked.wait()
 
     def set_close_reason(
-        self, reply_code: int = REPLY_SUCCESS,
+        self,
+        reply_code: int = REPLY_SUCCESS,
         reply_text: str = "normally closed",
-        class_id: int = 0, method_id: int = 0,
+        class_id: int = 0,
+        method_id: int = 0,
     ) -> None:
         self.__close_reply_code = reply_code
         self.__close_reply_text = reply_text
@@ -324,11 +354,7 @@ class Connection(Base, AbstractConnection):
             hasattr(self, "_writer_task") and not self._writer_task.done()
         )
 
-        return (
-            is_reader_running and
-            is_writer_running and
-            not self.is_closed
-        )
+        return is_reader_running and is_writer_running and not self.is_closed
 
     def __str__(self) -> str:
         return str(censor_url(self.url))
@@ -381,16 +407,17 @@ class Connection(Base, AbstractConnection):
             with suppress(KeyError):
                 return AuthMechanism[auth_requested]
         raise AuthenticationError(
-            start_frame.mechanisms, [m.name for m in AuthMechanism],
+            start_frame.mechanisms,
+            [m.name for m in AuthMechanism],
         )
 
     @staticmethod
     async def _rpc(
-        request: Frame, writer: asyncio.StreamWriter,
+        request: Frame,
+        writer: asyncio.StreamWriter,
         frame_receiver: FrameReceiver,
         wait_response: bool = True,
     ) -> Optional[FrameTypes]:
-
         writer.write(pamqp.frame.marshal(request, 0))
         await writer.drain()
 
@@ -401,7 +428,8 @@ class Connection(Base, AbstractConnection):
 
         if request.synchronous and frame.name not in request.valid_responses:
             raise AMQPInternalError(
-                "one of {!r}".format(request.valid_responses), frame,
+                "one of {!r}".format(request.valid_responses),
+                frame,
             )
         elif isinstance(frame, spec.Connection.Close):
             if frame.reply_code == 403:
@@ -411,7 +439,8 @@ class Connection(Base, AbstractConnection):
 
     @task
     async def connect(
-        self, client_properties: Optional[FieldTable] = None,
+        self,
+        client_properties: Optional[FieldTable] = None,
     ) -> bool:
         if self.is_opened:
             raise RuntimeError("Connection already opened")
@@ -420,14 +449,17 @@ class Connection(Base, AbstractConnection):
 
         if ssl_context is None and self.url.scheme == "amqps":
             ssl_context = await self.loop.run_in_executor(
-                None, self._get_ssl_context,
+                None,
+                self._get_ssl_context,
             )
             self.ssl_context = ssl_context
 
         log.debug("Connecting to: %s", self)
         try:
             reader, writer = await asyncio.open_connection(
-                self.url.host, self.url.port, ssl=ssl_context,
+                self.url.host,
+                self.url.port,
+                ssl=ssl_context,
             )
 
             frame_receiver = FrameReceiver(reader)
@@ -511,7 +543,8 @@ class Connection(Base, AbstractConnection):
         if not task.cancelled() and task.exception() is not None:
             log.debug("Cancelling cause reader exited abnormally")
             self.set_close_reason(
-                reply_code=500, reply_text="reader unexpected closed",
+                reply_code=500,
+                reply_text="reader unexpected closed",
             )
 
         async def close_writer_task() -> None:
@@ -534,9 +567,11 @@ class Connection(Base, AbstractConnection):
 
     async def __handle_close(self, frame: spec.Connection.Close) -> None:
         log.exception(
-            "Unexpected connection close from remote \"%s\", "
+            'Unexpected connection close from remote "%s", '
             "Connection.Close(reply_code=%r, reply_text=%r)",
-            self, frame.reply_code, frame.reply_text,
+            self,
+            frame.reply_code,
+            frame.reply_text,
         )
 
         self.write_queue.put_nowait(
@@ -549,36 +584,40 @@ class Connection(Base, AbstractConnection):
         exception = exception_by_code(frame)
 
         if (
-            self.__update_secret_future is not None and
-            not self.__update_secret_future.done()
+            self.__update_secret_future is not None
+            and not self.__update_secret_future.done()
         ):
             self.__update_secret_future.set_exception(exception)
         raise exception
 
     async def __handle_channel_close_ok(
-        self, _: spec.Channel.CloseOk,
+        self,
+        _: spec.Channel.CloseOk,
     ) -> None:
         self.channels.pop(0, None)
 
     async def __handle_channel_update_secret_ok(
-        self, frame: spec.Connection.UpdateSecretOk,
+        self,
+        frame: spec.Connection.UpdateSecretOk,
     ) -> None:
         if (
-            self.__update_secret_future is not None and
-            not self.__update_secret_future.done()
+            self.__update_secret_future is not None
+            and not self.__update_secret_future.done()
         ):
             self.__update_secret_future.set_result(frame)
             return
         log.warning("Got unexpected UpdateSecretOk frame")
 
     async def __handle_connection_blocked(
-        self, frame: spec.Connection.Blocked,
+        self,
+        frame: spec.Connection.Blocked,
     ) -> None:
         log.warning("Connection %r was blocked by: %r", self, frame.reason)
         self.__connection_unblocked.clear()
 
     async def __handle_connection_unblocked(
-        self, _: spec.Connection.Unblocked,
+        self,
+        _: spec.Connection.Unblocked,
     ) -> None:
         log.warning("Connection %r was unblocked", self)
         self.__connection_unblocked.set()
@@ -597,9 +636,7 @@ class Connection(Base, AbstractConnection):
             spec.Connection.Close: self.__handle_close,
             Heartbeat: self.__handle_heartbeat,
             spec.Channel.CloseOk: self.__handle_channel_close_ok,
-            spec.Connection.UpdateSecretOk: (
-                self.__handle_channel_update_secret_ok
-            ),
+            spec.Connection.UpdateSecretOk: (self.__handle_channel_update_secret_ok),
             spec.Connection.Blocked: self.__handle_connection_blocked,
             spec.Connection.Unblocked: self.__handle_connection_unblocked,
         }
@@ -609,8 +646,11 @@ class Connection(Base, AbstractConnection):
                 self.__last_frame_time = self.loop.time()
 
                 log.debug(
-                    "Received frame %r in channel #%d weight=%s on %r",
-                    frame, channel, weight, self,
+                    "Rzeceived frame %r in channel #%d weight=%s on %r",
+                    frame,
+                    channel,
+                    weight,
+                    self,
                 )
 
                 if channel == 0:
@@ -626,7 +666,9 @@ class Connection(Base, AbstractConnection):
                 ch: Optional[AbstractChannel] = self.channels.get(channel)
                 if ch is None:
                     log.error(
-                        "Got frame for closed channel %d: %r", channel, frame,
+                        "Got frame for closed channel %d: %r",
+                        channel,
+                        frame,
                     )
                     continue
 
@@ -638,7 +680,9 @@ class Connection(Base, AbstractConnection):
             if self.is_connection_was_stuck:
                 log.warning(
                     "Server connection %r was stuck. No frames were received "
-                    "in %d seconds.", self, self.__heartbeat_grace_timeout,
+                    "in %d seconds.",
+                    self,
+                    self.__heartbeat_grace_timeout,
                 )
                 self._reader_task.cancel()
                 self._writer_task.cancel()
@@ -652,7 +696,8 @@ class Connection(Base, AbstractConnection):
     async def __heartbeat(self) -> None:
         heartbeat_timeout = max(1, self.heartbeat_timeout // 2)
         heartbeat = ChannelFrame.marshall(
-            frames=[Heartbeat()], channel_number=0,
+            frames=[Heartbeat()],
+            channel_number=0,
         )
 
         while not self.closing.done():
@@ -713,7 +758,8 @@ class Connection(Base, AbstractConnection):
 
             try:
                 await asyncio.wait_for(
-                    writer.drain(), timeout=self.__heartbeat_grace_timeout,
+                    writer.drain(),
+                    timeout=self.__heartbeat_grace_timeout,
                 )
             finally:
                 await self.__close_writer(writer)
@@ -723,10 +769,13 @@ class Connection(Base, AbstractConnection):
             log.debug("Writer exited for %r", self)
 
     if sys.version_info < (3, 7):
+
         async def __close_writer(self, writer: asyncio.StreamWriter) -> None:
             log.debug("Writer on connection %s closed", self)
             writer.close()
+
     else:
+
         async def __close_writer(self, writer: asyncio.StreamWriter) -> None:
             log.debug("Writer on connection %s closed", self)
             with suppress(OSError, RuntimeError):
@@ -759,12 +808,14 @@ class Connection(Base, AbstractConnection):
             self._writer_task.cancel()
 
         await asyncio.gather(
-            self._reader_task, self._writer_task, return_exceptions=True,
+            self._reader_task,
+            self._writer_task,
+            return_exceptions=True,
         )
 
     @property
     def server_capabilities(self) -> ArgumentsType:
-        return self.server_properties["capabilities"]   # type: ignore
+        return self.server_properties["capabilities"]  # type: ignore
 
     @property
     def basic_nack(self) -> bool:
@@ -793,7 +844,6 @@ class Connection(Base, AbstractConnection):
         timeout: TimeoutType = None,
         **kwargs: Any,
     ) -> AbstractChannel:
-
         await self.connected.wait()
 
         if self.is_closed:
@@ -842,14 +892,18 @@ class Connection(Base, AbstractConnection):
         return channel
 
     async def update_secret(
-        self, new_secret: str, *,
-        reason: str = "", timeout: TimeoutType = None,
+        self,
+        new_secret: str,
+        *,
+        reason: str = "",
+        timeout: TimeoutType = None,
     ) -> spec.Connection.UpdateSecretOk:
         channel_frame = ChannelFrame.marshall(
             channel_number=0,
             frames=[
                 spec.Connection.UpdateSecret(
-                    new_secret=new_secret, reason=reason,
+                    new_secret=new_secret,
+                    reason=reason,
                 ),
             ],
         )
@@ -860,8 +914,8 @@ class Connection(Base, AbstractConnection):
             self.__update_secret_future = self.loop.create_future()
             await self.write_queue.put(channel_frame)
             try:
-                response: spec.Connection.UpdateSecretOk = (
-                    await countdown(self.__update_secret_future)
+                response: spec.Connection.UpdateSecretOk = await countdown(
+                    self.__update_secret_future
                 )
             finally:
                 self.__update_secret_future = None
@@ -882,7 +936,9 @@ class Connection(Base, AbstractConnection):
 
 
 async def connect(
-    url: URLorStr, *args: Any, client_properties: Optional[FieldTable] = None,
+    url: URLorStr,
+    *args: Any,
+    client_properties: Optional[FieldTable] = None,
     **kwargs: Any,
 ) -> AbstractConnection:
     connection = Connection(url, *args, **kwargs)

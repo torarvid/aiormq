@@ -6,8 +6,13 @@ from typing import Any, Callable, Coroutine, Optional, Set, TypeVar, Union
 from weakref import WeakSet
 
 from .abc import (
-    AbstractBase, AbstractFutureStore, CoroutineType, ExceptionType, TaskType,
-    TaskWrapper, TimeoutType,
+    AbstractBase,
+    AbstractFutureStore,
+    CoroutineType,
+    ExceptionType,
+    TaskType,
+    TaskWrapper,
+    TimeoutType,
 )
 from .tools import Countdown, shield
 
@@ -28,7 +33,8 @@ class FutureStore(AbstractFutureStore):
         self.parent: Optional[FutureStore] = None
 
     def __on_task_done(
-        self, future: Union[asyncio.Future, TaskWrapper],
+        self,
+        future: Union[asyncio.Future, TaskWrapper],
     ) -> Callable[..., Any]:
         def remover(*_: Any) -> None:
             nonlocal future
@@ -83,7 +89,9 @@ class Base(AbstractBase):
     __slots__ = "loop", "__future_store", "closing"
 
     def __init__(
-        self, *, loop: asyncio.AbstractEventLoop,
+        self,
+        *,
+        loop: asyncio.AbstractEventLoop,
         parent: Optional[AbstractBase] = None,
     ):
         self.loop: asyncio.AbstractEventLoop = loop
@@ -101,7 +109,8 @@ class Base(AbstractBase):
         return future
 
     def _cancel_tasks(
-        self, exc: Optional[ExceptionType] = None,
+        self,
+        exc: Optional[ExceptionType] = None,
     ) -> Coroutine[Any, Any, None]:
         return self.__future_store.reject_all(exc)
 
@@ -116,7 +125,8 @@ class Base(AbstractBase):
 
     @abc.abstractmethod
     async def _on_close(
-        self, exc: Optional[ExceptionType] = None,
+        self,
+        exc: Optional[ExceptionType] = None,
     ) -> None:  # pragma: no cover
         return
 
@@ -131,7 +141,8 @@ class Base(AbstractBase):
             await self._cancel_tasks(exc)
 
     async def close(
-        self, exc: Optional[ExceptionType] = asyncio.CancelledError,
+        self,
+        exc: Optional[ExceptionType] = asyncio.CancelledError,
         timeout: TimeoutType = None,
     ) -> None:
         if self.is_closed:
@@ -143,7 +154,9 @@ class Base(AbstractBase):
     def __repr__(self) -> str:
         cls_name = self.__class__.__name__
         return '<{0}: "{1}" at 0x{2:02x}>'.format(
-            cls_name, str(self), id(self),
+            cls_name,
+            str(self),
+            id(self),
         )
 
     @abc.abstractmethod
